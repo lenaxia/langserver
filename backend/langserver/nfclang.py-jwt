@@ -1,0 +1,142 @@
+from googletrans import Translator, LANGUAGES
+from gtts import gTTS
+import os
+import re
+import io
+import jwt
+import datetime
+from flask import Flask, request, jsonify, send_file
+from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from functools import wraps
+import logging
+from logging.handlers import RotatingFileHandler
+
+app = Flask(__name__)
+
+# Environment variables for configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI', 'sqlite:///tokens.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB limit
+
+# Secret key for JWT - store this securely
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your_secret_key')
+
+# Rate Limiter Configuration
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+limiter.init_app(app)
+
+# Logging Configuration
+if not app.debug:
+    log_format = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=1)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(log_format)
+    app.logger.addHandler(handler)
+
+db = SQLAlchemy(app)
+
+class APIToken(db.Model):
+    id = db.Column(db.String(80), primary_key=True)
+    token = db.Column(db.String(120), unique=True, nullable=False)
+
+# JWT encode function
+def encode_auth_token(user_id):
+    try:
+        payload = {
+            'exp': datetime.datetime.utcnow() + datetime.timedelta(days=3000),
+            'iat': datetime.datetime.utcnow(),
+            'sub': user_id
+        }
+        return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+    except Exception as e:
+        return e
+
+# Decorator for verifying JWT
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if not token:
+            return jsonify({'message': 'Token is missing!'}), 403
+
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            current_user = payload['sub']
+        except jwt.ExpiredSignatureError:
+            return jsonify({'message': 'Token expired!'}), 403
+        except jwt.InvalidTokenError:
+            return jsonify({'message': 'Invalid token!'}), 403
+
+        return f(current_user, *args, **kwargs)
+
+    return decorated
+
+@app.route('/add-token/<id>', methods=['POST'])
+def add_token(id):
+    if not re.match("^[a-zA-Z0-9_-]+$", id):
+        return jsonify({'error': 'Invalid ID format.'}), 400
+
+    existing_user = APIToken.query.filter_by(id=id).first()
+    if existing_user:
+        return jsonify({'error': 'User already exists'}), 409
+
+    token = encode_auth_token(id)
+    if isinstance(token, str):
+        new_token = APIToken(id=id, token=token)
+        db.session.add(new_token)
+        db.session.commit()
+        return jsonify({'token': token}), 201
+    else:
+        return jsonify({'error': 'Could not generate token'}), 500
+
+
+@app.route('/generate-speech', methods=['POST'])
+@token_required
+@limiter.limit("10 per minute")
+def generate_speech(current_user):
+    data = request.json
+    text = data.get("text")
+
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+
+    try:
+        # Translate text to Mandarin
+        translator = Translator()
+        translation = translator.translate(text, src='en', dest='zh-cn')
+        mandarin_text = translation.text
+
+        # Generate speech in English
+        tts_en = gTTS(text=text, lang='en')
+        mp3_fp_en = io.BytesIO()
+        tts_en.write_to_fp(mp3_fp_en)
+
+        # Generate speech in Mandarin
+        tts_mn = gTTS(text=mandarin_text, lang='zh-cn')
+        mp3_fp_mn = io.BytesIO()
+        tts_mn.write_to_fp(mp3_fp_mn)
+
+        # Combine both audio files into one
+        mp3_fp_en.seek(0)
+        mp3_fp_mn.seek(0)
+        combined_mp3 = io.BytesIO()
+        combined_mp3.write(mp3_fp_en.read() + mp3_fp_mn.read())
+        combined_mp3.seek(0)
+
+        return send_file(combined_mp3, mimetype='audio/mpeg')
+    except Exception as e:
+        return jsonify({"error": "Text-to-Speech conversion failed", "details": str(e)}), 500
+
+# After defining your models and before starting the app
+with app.app_context():
+    db.create_all()
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
