@@ -1,10 +1,11 @@
-# myapp/__init__.py
+# langserver/__init__.py
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 import os
+import sys
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -17,15 +18,29 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URI', 'sqlite:/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1 MB limit
 
+# Environment variable for log level
+log_level = os.environ.get('LOGLEVEL', 'DEBUG').upper()
+
+# Map string log level to logging level constants
+log_level_dict = {
+    'DEBUG': logging.DEBUG,
+    'INFO': logging.INFO,
+    'WARNING': logging.WARNING,
+    'ERROR': logging.ERROR,
+    'CRITICAL': logging.CRITICAL
+}
+
 # Initialize extensions
 db = SQLAlchemy(app)
 limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
-
 limiter.init_app(app)
 
 # Logging configuration
-logging.basicConfig(filename='app.log', level=logging.DEBUG,
-                    format='%(asctime)s %(levelname)s: %(message)s')
+logging.basicConfig(
+    level=log_level_dict.get(log_level, logging.DEBUG),
+    format='%(asctime)s %(levelname)s: %(message)s',
+    stream=sys.stdout
+)
 
 # Import routes
 from . import routes

@@ -1,3 +1,4 @@
+# langserver/routes.py
 from googletrans import Translator, LANGUAGES
 from gtts import gTTS, lang
 import os
@@ -13,7 +14,7 @@ from flask_cors import CORS
 from functools import wraps
 import logging
 from logging.handlers import RotatingFileHandler
-from . import app, limiter
+from . import app, limiter, db
 from .models import APIToken
 
 def require_token(f):
@@ -177,6 +178,4 @@ def list_tokens():
         return jsonify({"error": "Failed to retrieve tokens", "details": str(e)}), 500
 
 
-if __name__ == '__main__':
-    app.run(debug=True)
 
