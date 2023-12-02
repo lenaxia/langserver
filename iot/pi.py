@@ -11,7 +11,7 @@ import sys
 # Environment and Configuration
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
 SERVER_NAME = os.getenv('SERVER_NAME', "http://localhost:5000/generate-speech")
-API_TOKEN = os.getenv('API_TOKEN', "DMvSTNTQ252PGClp4s3ozsifK9TKtnU7")
+API_TOKEN = os.getenv('API_TOKEN', "A3BQEJMGGGDG2JGCKSKwicAQYqYT9k7W")
 HEADERS = {
     "Content-Type": "application/json",
     "Authorization": API_TOKEN

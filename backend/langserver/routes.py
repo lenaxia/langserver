@@ -6,6 +6,8 @@ import re
 import io
 import base64
 import datetime
+import string
+import secrets
 from flask import Flask, request, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
@@ -17,6 +19,18 @@ from logging.handlers import RotatingFileHandler
 from . import app, limiter, db
 from .models import APIToken
 
+"""
+Decorator to require an API token for access to the decorated function.
+
+Parameters:
+- f: The function to be decorated.
+
+Returns:
+- The decorated function.
+
+Raises:
+- Unauthorized access error if the token is invalid or missing.
+"""
 def require_token(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -26,9 +40,22 @@ def require_token(f):
         return f(*args, **kwargs)
     return decorated_function
 
+"""
+Adds a token to the API.
+
+Parameters:
+    id (str): The ID of the token to be added.
+
+Returns:
+    dict: A JSON object containing the added token.
+
+Raises:
+    None
+"""
 @app.route('/add-token/<id>', methods=['POST'])
 @limiter.limit("2 per minute")
 def add_token(id):
+ 
     if not re.match("^[a-zA-Z0-9_-]+$", id):
         return jsonify({'error': 'Invalid ID format'}), 400
 
@@ -36,14 +63,26 @@ def add_token(id):
     if existing_token:
         return jsonify({'token': existing_token.token}), 200
 
-    random_bytes = os.urandom(24)
-    token = base64.b64encode(random_bytes).decode('utf-8')
+    token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
     new_token = APIToken(id=id, token=token)
     
     db.session.add(new_token)
     db.session.commit()
     return jsonify({'token': token}), 201
 
+"""
+Revoke a token.
+
+This function is responsible for revoking a token. It takes in a token string as a parameter and checks if the token exists in the database. If the token is found, it is deleted from the database. If the token is not found, an error message is returned. If any exception occurs during the process, an internal server error message is returned.
+
+Parameters:
+- None
+
+Returns:
+- If the token is successfully revoked, a JSON response with a success message and status code 200.
+- If the token is not found, a JSON response with an error message and status code 404.
+- If any exception occurs, a JSON response with an error message and status code 500.
+"""
 @app.route('/revoke-token', methods=['POST'])
 @limiter.limit("10 per minute")
 def revoke_token():
@@ -66,6 +105,18 @@ def revoke_token():
         app.logger.error(f"Error in revoke-token: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
+"""
+Regenerates a new API token for the given token ID.
+
+Parameters:
+    None
+
+Returns:
+    - If the token ID is missing: a JSON response with an error message and a 400 status code.
+    - If the token ID is not found: a JSON response with an error message and a 404 status code.
+    - If the token is regenerated successfully: a JSON response with the new token and a 200 status code.
+    - If an exception occurs: a JSON response with an error message and a 500 status code.
+"""
 @app.route('/regenerate-token', methods=['POST'])
 @limiter.limit("2 per minute")
 def regenerate_token():
@@ -95,14 +146,28 @@ def regenerate_token():
         app.logger.error(f"Error in regenerate-token: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
-## Valid formats:
-#{"localization": {
-#    "zh-tw": "馬",
-#    "en": "horse"}}
-#Or
-#{"text": "horse",
-#"language": "en",
-#"translations": ["zh-TW", "de"]}
+"""
+Generates speech based on the provided input data.
+
+Args:
+    None
+
+Returns:
+    If successful, returns an audio file containing the generated speech in MP3 format.
+    If unsuccessful, returns a JSON response with an error message and details.
+
+Valid payloads:
+{"localization": {
+    "zh-tw": "馬",
+    "en": "horse"}}
+Or
+{"text": "horse",
+"language": "en",
+"translations": ["zh-TW", "de"]}  
+
+Example Curl:
+ curl -X POST http://localhost:5000/generate-speech -H "Authorization: 1qjEkUygv1QfALZnTk8LLUhHWM2rJfHr" -H "Content-Type: application/json" -d '{"text": "the quick brown fox jumped over the lazy dog","language": "en","translations": ["zh-TW"]}' -o response.mp3
+"""
 @app.route('/generate-speech', methods=['POST'])
 @require_token
 @limiter.limit("10 per minute")
@@ -166,6 +231,15 @@ def generate_speech():
         app.logger.error(f"Error in generate-speech: {e}")
         return jsonify({"error": "Text-to-Speech conversion failed", "details": str(e)}), 500
 
+"""
+Retrieves a list of all tokens.
+
+Returns:
+    - A JSON response with the list of tokens and their corresponding IDs.
+        Example: [{"id": 1, "token": "abc123"}, {"id": 2, "token": "xyz456"}]
+    - If an error occurs, a JSON response with an error message and details.
+        Example: {"error": "Failed to retrieve tokens", "details": "Database connection error"}
+"""
 @app.route('/list-tokens', methods=['GET'])
 @require_token
 def list_tokens():
