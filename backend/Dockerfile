@@ -4,6 +4,9 @@ FROM python:3.9-slim
 # Set the working directory in the container
 WORKDIR /app
 
+# create config directory
+RUN mkdir /config
+
 # Set environment variables for runtime
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -23,6 +26,7 @@ RUN groupadd -r appuser -g ${PGID} && useradd -r -g appuser -u ${PUID} appuser
 # Create and set ownership of necessary directories
 RUN mkdir -p /home/appuser && chown -R appuser:appuser /home/appuser
 RUN chown -R appuser:appuser /app
+RUN chown -R appuser:appuser /config
 
 # Install any needed packages specified in requirements.txt as root
 # This ensures global installation
@@ -35,7 +39,6 @@ USER appuser
 
 # Copy the current directory contents into the container at /usr/src/app
 COPY . .
-RUN pip3 show flask
 
 # Make port 80 available to the world outside this container
 EXPOSE 80

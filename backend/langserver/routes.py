@@ -18,6 +18,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 from . import app, limiter, db
 from .models import APIToken
+import hashlib
+from flask import current_app
 
 """
 Decorator to require an API token for access to the decorated function.
@@ -34,41 +36,135 @@ Raises:
 def require_token(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not APIToken.query.filter_by(token=token).first():
+        incoming_token = request.headers.get('Authorization')
+        if not incoming_token:
+            current_app.logger.warning("Missing Authorization header")
             return jsonify({'error': 'Unauthorized access'}), 401
+        
+        # Retrieve the admin token from app config
+        admin_token = current_app.config.get('ADMIN_TOKEN')
+        
+        # Check if the provided token is the admin token
+        if incoming_token == admin_token:
+            return f(*args, **kwargs)
+
+        hashed_token = APIToken.hash_token(incoming_token, current_app.config.get('ADMIN_TOKEN', ''))
+        token_record = APIToken.query.filter_by(token=hashed_token).first()
+        if not token_record:
+            current_app.logger.warning(f"Invalid token attempted: {incoming_token}")
+            return jsonify({'error': 'Unauthorized access'}), 401
+
+        # Apply rate limit based on the token's rate limit setting
+        limiter.limit(f"{token_record.rate_limit} per minute")(f)
         return f(*args, **kwargs)
     return decorated_function
 
 """
-Adds a token to the API.
-
-Parameters:
-    id (str): The ID of the token to be added.
+Adds a new token to the API.
 
 Returns:
-    dict: A JSON object containing the added token.
-
-Raises:
-    None
+    - If the token ID is invalid or missing, returns a JSON response with an error message and a 400 status code.
+    - If the token already exists for the given ID, returns a JSON response with the existing token and a 200 status code.
+    - If the token is successfully added to the database, returns a JSON response with the new token and a 201 status code.
+    - If there is an error adding the token to the database, returns a JSON response with an error message and a 500 status code.
 """
-@app.route('/add-token/<id>', methods=['POST'])
-@limiter.limit("2 per minute")
-def add_token(id):
- 
-    if not re.match("^[a-zA-Z0-9_-]+$", id):
+@app.route('/add-token', methods=['POST'])
+@limiter.limit("10 per minute")
+def add_token():
+    data = request.json or {}
+    token_id = data.get('id')
+    rate_limit_input = data.get('rate_limit')
+
+    # Validate token ID
+    if not token_id or not re.match("^[a-zA-Z0-9_-]+$", token_id):
+        current_app.logger.error("Invalid token ID format or missing ID")
         return jsonify({'error': 'Invalid ID format'}), 400
 
-    existing_token = APIToken.query.filter_by(id=id).first()
-    if existing_token:
-        return jsonify({'token': existing_token.token}), 200
+    # Validate rate limit as integer
+    if isinstance(rate_limit_input, int):
+        rate_limit = rate_limit_input
+    else:
+        rate_limit = int(current_app.config.get('DEFAULT_RATE_LIMIT', 10))
 
-    token = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
-    new_token = APIToken(id=id, token=token)
-    
-    db.session.add(new_token)
-    db.session.commit()
-    return jsonify({'token': token}), 201
+    # Check for existing token
+    if existing_token := APIToken.query.filter_by(id=token_id).first():
+        current_app.logger.info(f"Token ID {token_id} already exists.")
+        return jsonify({'message': 'Token ID already exists. Please use a different ID.'}), 409
+
+    # Generate the new token as a separate string
+    new_token_str = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
+
+    # Salt and hash the token as a separate action
+    admin_token = current_app.config.get('ADMIN_TOKEN', '')
+    salted_hashed_token = APIToken.hash_token(new_token_str, admin_token)
+
+    # Create a new APIToken instance with the salted and hashed token
+    new_token = APIToken(id=token_id, token=salted_hashed_token, rate_limit=rate_limit)
+
+    try:
+        db.session.add(new_token)
+        db.session.commit()
+    except Exception as e:
+        current_app.logger.error(f"Error adding token: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
+    # Return the original, unsalted, unhashed token
+    return jsonify({'token': new_token_str}), 201
+
+
+
+
+"""
+Edit a token's rate limit.
+
+Returns:
+    JSON: A JSON response with the following keys:
+        - 'message': A success message if the token was updated successfully.
+        - 'error': An error message if there was an issue with the request.
+
+Raises:
+    400: If the token ID format is invalid or missing.
+    404: If the token ID is not found.
+    500: If there is an internal server error.
+
+"""
+@app.route('/edit-token', methods=['POST'])
+@limiter.limit("2 per minute")
+def edit_token():
+    data = request.json or {}
+    token_id = data.get('id')
+    rate_limit_input = data.get('rate_limit')
+
+    # Validate token ID
+    if not token_id or not re.match("^[a-zA-Z0-9_-]+$", token_id):
+        app.logger.error("Invalid token ID format or missing ID")
+        return jsonify({'error': 'Invalid ID format'}), 400
+
+    # Determine rate limit value
+    if rate_limit_input is not None:
+        try:
+            rate_limit = int(rate_limit_input)
+        except ValueError:
+            app.logger.error("Rate limit must be an integer")
+            return jsonify({'error': 'Rate limit must be an integer'}), 400
+    else:
+        rate_limit = current_app.config.get('DEFAULT_RATE_LIMIT', 10)
+
+    token = APIToken.query.filter_by(id=token_id).first()
+    if not token:
+        app.logger.error(f"Token ID not found: {token_id}")
+        return jsonify({'error': 'Token ID not found'}), 404
+
+    try:
+        # Update the rate limit
+        token.rate_limit = rate_limit
+        db.session.commit()
+        app.logger.info(f"Token updated successfully for ID: {token_id}")
+        return jsonify({'message': 'Token updated successfully'}), 200
+    except Exception as e:
+        app.logger.error(f"Error in edit-token: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
 
 """
 Revoke a token.
@@ -118,7 +214,7 @@ Returns:
     - If an exception occurs: a JSON response with an error message and a 500 status code.
 """
 @app.route('/regenerate-token', methods=['POST'])
-@limiter.limit("2 per minute")
+@limiter.limit("10 per minute")
 def regenerate_token():
     try:
         token_id = request.json.get('id')
@@ -131,20 +227,29 @@ def regenerate_token():
             app.logger.info(f'Token ID not found for regeneration: {token_id}')
             return jsonify({'error': 'Token ID not found'}), 404
 
+        # Generate the new token as a separate string
+        random_bytes = os.urandom(24)
+        new_token_str = base64.b64encode(random_bytes).decode('utf-8')
+
+        # Salt and hash the token as a separate action
+        admin_token = current_app.config.get('ADMIN_TOKEN', '')
+        salted_hashed_token = APIToken.hash_token(new_token_str, admin_token)
+
+        # Delete the old token and add the new salted and hashed token
         db.session.delete(token)
         db.session.commit()
 
-        random_bytes = os.urandom(24)
-        new_token_str = base64.b64encode(random_bytes).decode('utf-8')
-        new_token = APIToken(id=token_id, token=new_token_str)
+        new_token = APIToken(id=token_id, token=salted_hashed_token)
         db.session.add(new_token)
         db.session.commit()
 
         app.logger.info(f'Token regenerated successfully for ID: {token_id}')
+        # Return the original, unsalted, unhashed token
         return jsonify({'new_token': new_token_str}), 200
     except Exception as e:
         app.logger.error(f"Error in regenerate-token: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
+
 
 """
 Generates speech based on the provided input data.
@@ -242,14 +347,23 @@ Returns:
 """
 @app.route('/list-tokens', methods=['GET'])
 @require_token
+@limiter.limit("10 per minute")
 def list_tokens():
     try:
         tokens = APIToken.query.all()
-        token_list = [{'id': token.id, 'token': token.token} for token in tokens]
+        token_list = [
+            {
+                'id': token.id,
+                'token': token.token,  # This is the hashed token
+                'rate_limit': token.rate_limit,
+                'date_created': token.date_created.strftime('%Y-%m-%d %H:%M') if token.date_created else None
+            } for token in tokens
+        ]
         return jsonify(token_list), 200
     except Exception as e:
         app.logger.error(f"Error in list-tokens: {e}")
         return jsonify({"error": "Failed to retrieve tokens", "details": str(e)}), 500
+
 
 
 
