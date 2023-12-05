@@ -1,3 +1,7 @@
+.add-token {
+  text-align: right
+}
+
 .App {
   text-align: center;
 }
@@ -38,6 +42,16 @@
 }
 
 /* App.css */
+.components-wrapper {
+  width: 80%; /* Example width */
+  margin: 0 auto; /* Center the wrapper */
+}
+
+@media screen and (max-width: 1000px) {
+  .hashed-token {
+    display: none;
+  }
+}
 
 .container {
   padding: 20px;
@@ -77,6 +91,11 @@
 
 .audioPlayer {
   margin-top: 10px;
+}
+
+.new-token-alert {
+  padding-bottom: 10px;
+  text-align: left;
 }
 
 /* Add this to your App.css or a similar CSS file */
@@ -154,13 +173,19 @@
 /* App.css */
 .token-table {
   font-size: 0.8rem; /* Adjust the font size here */
-  border-collapse: collapse
+  border-collapse: collapse;
 }
 
+.token-manager {
+  margin-top: 20px; /* Adjust as needed */
+}
+
+svg.svg-inline--fa.fa-floppy-disk,
+svg.svg-inline--fa.fa-xmark,
 svg.svg-inline--fa.fa-pen-to-square,
 svg.svg-inline--fa.fa-arrow-rotate-right,
 svg.svg-inline--fa.fa-trash-can {
-  margin: 2px; 
+  margin: 4px; 
   cursor: pointer;
 }
 

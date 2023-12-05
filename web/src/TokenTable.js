@@ -1,23 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt, faSave, faTimes, faRedo } from '@fortawesome/free-solid-svg-icons';
 import './App.css';
 
-function TokenTable({ adminToken }) {
+function TokenTable({ adminToken, apiUrl }) {
   const [tokens, setTokens] = useState([]);
   const [error, setError] = useState('');
   const [editTokenId, setEditTokenId] = useState(null);
   const [editedRateLimit, setEditedRateLimit] = useState({});
   const [newToken, setNewToken] = useState(null);
+  const [newTokenId, setNewTokenId] = useState('');
 
   useEffect(() => {
     fetchTokens();
   }, [adminToken]);
 
-  const fetchTokens = async () => {
+  const fetchTokens = useCallback(async () => {
     try {
-      const response = await axios.get('http://localhost:5000/list-tokens', {
+      const response = await axios.get(`${apiUrl}/list-tokens`, {
         headers: { Authorization: adminToken }
       });
       setTokens(response.data);
@@ -25,26 +26,60 @@ function TokenTable({ adminToken }) {
       console.error('Error fetching tokens:', error);
       setError('Failed to fetch tokens');
     }
+  }, [adminToken, apiUrl]); // adminToken is a dependency of fetchTokens
+
+  const addToken = async () => {
+    if (!newTokenId) {
+      setError('Please enter an ID');
+      return;
+    }
+    setError('');
+    try {
+      const response = await axios.post(`${apiUrl}/add-token`, { id: newTokenId }, {
+        headers: { Authorization: adminToken }
+      });
+  
+      const addedToken = response.data.token;
+      setNewToken(addedToken);
+      fetchTokens(); // Refresh token list
+    } catch (error) {
+      console.error('Error adding token:', error.response?.data?.error || error.message);
+      setError(error.response?.data?.error || 'Failed to add token');
+    }
   };
+  
 
   const handleRegenerateClick = async (tokenId) => {
-    // Display a confirmation dialog
     const confirmRegenerate = window.confirm('Are you sure you want to regenerate this token?');
     if (confirmRegenerate) {
-      // If the user confirms, proceed with the regeneration
       try {
-        const response = await axios.post('http://localhost:5000/regenerate-token', { id: tokenId }, {
+        // Retrieve the current token's details, especially the rate limit
+        const tokenDetails = tokens.find(token => token.id === tokenId);
+        if (!tokenDetails) {
+          setError('Token not found');
+          return;
+        }
+  
+        // Revoke the existing token
+        await axios.post(`${apiUrl}/revoke-token`, { token: tokenId }, {
           headers: { Authorization: adminToken }
         });
-        setNewToken(response.data.new_token); // Update the state with the new token
+  
+        // Add a new token with the same ID and the previous rate limit
+        const response = await axios.post(`${apiUrl}/add-token`, { id: tokenId, rate_limit: tokenDetails.rate_limit }, {
+          headers: { Authorization: adminToken }
+        });
+  
+        const newToken = response.data.token;
+        setNewToken(newToken); // Update the state with the new token
         fetchTokens(); // Refresh the token list
       } catch (error) {
         console.error('Error regenerating token:', error);
         setError('Failed to regenerate token');
       }
     }
-    // If the user cancels, do nothing
   };
+  
   
 
   const handleDeleteClick = async (tokenId) => {
@@ -53,7 +88,7 @@ function TokenTable({ adminToken }) {
     if (confirmDelete) {
       // If the user confirms, proceed with the deletion
       try {
-        await axios.post('http://localhost:5000/revoke-token', { token: tokenId }, {
+        await axios.post(`${apiUrl}/revoke-token`, { token: tokenId }, {
           headers: { Authorization: adminToken }
         });
         fetchTokens(); // Refresh the token list
@@ -78,7 +113,7 @@ function TokenTable({ adminToken }) {
   const handleSaveEdit = async (tokenId) => {
     try {
       const newRateLimit = editedRateLimit[tokenId];
-      await axios.post('http://localhost:5000/edit-token', 
+      await axios.post(`${apiUrl}/edit-token`, 
         { id: tokenId, rate_limit: parseInt(newRateLimit, 10) },
         { headers: { Authorization: adminToken }}
       );
@@ -97,11 +132,20 @@ function TokenTable({ adminToken }) {
           <strong>New Token:</strong> {newToken}
         </div>
       )}
+      <div className="add-token">
+        <input
+          type="text"
+          value={newTokenId}
+          onChange={(e) => setNewTokenId(e.target.value)}
+          placeholder="Create a new token"
+        />
+        <button onClick={addToken}>+</button>
+      </div>
       <table style={{ fontSize: '0.8rem' }} className="table table-sm table-bordered table-striped">
         <thead>
           <tr>
             <th>ID</th>
-            <th>Hashed+Salted Token</th>
+            <th className="hashed-token">Hashed+Salted Token</th>
             <th>Rate Limit</th>
             <th>Date Created</th>
             <th>Actions</th>
@@ -111,7 +155,7 @@ function TokenTable({ adminToken }) {
           {tokens.map((token) => (
             <tr key={token.id}>
               <td>{token.id}</td>
-              <td>{token.token}</td>
+              <td className="hashed-token">{token.token}</td>
               <td>
                 {editTokenId === token.id ? (
                   <input 

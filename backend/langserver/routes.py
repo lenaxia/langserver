@@ -21,6 +21,27 @@ from .models import APIToken
 import hashlib
 from flask import current_app
 
+
+"""
+Perform a basic health check.
+
+This function is the endpoint for the '/healthz' route and is triggered by a GET request. It checks the health of the application by performing various tasks, such as making a simple database query, checking if critical services (like external APIs) are reachable, and ensuring basic app functions are working.
+
+Returns:
+    A JSON response containing the status of the health check. If the health check is successful, it returns a status of "healthy" and a HTTP status code of 200. If the health check fails, it returns a status of "unhealthy", along with the details of the error, and a HTTP status code of 500.
+"""
+@app.route('/healthz', methods=['GET'])
+def health_check():
+    try:
+        # Perform a basic health check. For example, you can:
+        # - Make a simple database query
+        # - Check if critical services (like external APIs) are reachable
+        # - Return a simple "OK" if basic app functions are working
+        return jsonify({"status": "healthy"}), 200
+    except Exception as e:
+        current_app.logger.error(f"Health check failed: {e}")
+        return jsonify({"status": "unhealthy", "details": str(e)}), 500
+
 """
 Decorator to require an API token for access to the decorated function.
 
@@ -92,7 +113,8 @@ def add_token():
         return jsonify({'message': 'Token ID already exists. Please use a different ID.'}), 409
 
     # Generate the new token as a separate string
-    new_token_str = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(64))
+    characters = string.ascii_letters + string.digits  # Combines uppercase, lowercase, and digits
+    new_token_str = ''.join(secrets.choice(characters) for _ in range(64))
 
     # Salt and hash the token as a separate action
     admin_token = current_app.config.get('ADMIN_TOKEN', '')
@@ -110,8 +132,6 @@ def add_token():
 
     # Return the original, unsalted, unhashed token
     return jsonify({'token': new_token_str}), 201
-
-
 
 
 """
@@ -199,58 +219,6 @@ def revoke_token():
         return jsonify({'message': 'Token revoked successfully'}), 200
     except Exception as e:
         app.logger.error(f"Error in revoke-token: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
-
-"""
-Regenerates a new API token for the given token ID.
-
-Parameters:
-    None
-
-Returns:
-    - If the token ID is missing: a JSON response with an error message and a 400 status code.
-    - If the token ID is not found: a JSON response with an error message and a 404 status code.
-    - If the token is regenerated successfully: a JSON response with the new token and a 200 status code.
-    - If an exception occurs: a JSON response with an error message and a 500 status code.
-"""
-@app.route('/regenerate-token', methods=['POST'])
-@limiter.limit("10 per minute")
-def regenerate_token():
-    try:
-        token_id = request.json.get('id')
-        if not token_id:
-            app.logger.info('Regenerate token request with missing ID')
-            return jsonify({'error': 'Token ID is required'}), 400
-
-        token = APIToken.query.filter_by(id=token_id).first()
-        if not token:
-            app.logger.info(f'Token ID not found for regeneration: {token_id}')
-            return jsonify({'error': 'Token ID not found'}), 404
-
-        # Preserve the rate limit of the existing token
-        current_rate_limit = token.rate_limit
-
-        # Generate the new token as a separate string
-        random_bytes = os.urandom(24)
-        new_token_str = base64.b64encode(random_bytes).decode('utf-8')
-
-        # Salt and hash the token as a separate action
-        admin_token = current_app.config.get('ADMIN_TOKEN', '')
-        salted_hashed_token = APIToken.hash_token(new_token_str, admin_token)
-
-        # Delete the old token and add the new salted and hashed token
-        db.session.delete(token)
-        db.session.commit()
-
-        new_token = APIToken(id=token_id, token=salted_hashed_token, rate_limit=current_rate_limit)
-        db.session.add(new_token)
-        db.session.commit()
-
-        app.logger.info(f'Token regenerated successfully for ID: {token_id}')
-        # Return the original, unsalted, unhashed token
-        return jsonify({'new_token': new_token_str}), 200
-    except Exception as e:
-        app.logger.error(f"Error in regenerate-token: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
 

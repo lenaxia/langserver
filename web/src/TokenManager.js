@@ -14,7 +14,7 @@ function TokenManager({ setTokenFromApp }) {
     }
     setError('');
     try {
-      const response = await axios.post(`http://localhost:5000/add-token/${id}`);
+      const response = await axios.post(`${API_BASE_URL}/add-token/${id}`);
       const newToken = response.data.token;
       setToken(newToken);
       setTokenFromApp(newToken); // Update token in App.js
@@ -31,7 +31,7 @@ function TokenManager({ setTokenFromApp }) {
     }
     setError('');
     try {
-      const response = await axios.post('http://localhost:5000/revoke-token', { token: id });
+      const response = await axios.post('${API_BASE_URL}/revoke-token', { token: id });
       alert(response.data.message); // Alert success message
     } catch (error) {
       console.error('Error revoking token:', error);

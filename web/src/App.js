@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import './App.css';
 import TokenTable from './TokenTable';
+import SpeechGenerator from './SpeechGenerator'; // Import SpeechGenerator
+
 
 function App() {
   const [adminToken, setAdminToken] = useState('');
   const [isTokenSubmitted, setIsTokenSubmitted] = useState(false);
+
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://192.168.2.110:5000';
 
   const handleTokenSubmit = () => {
     setIsTokenSubmitted(true);
@@ -28,8 +32,13 @@ function App() {
             </button>
           </div>
         )}
-        {isTokenSubmitted && <TokenTable adminToken={adminToken} />}
-      </header>
+        {isTokenSubmitted && (
+          <div className="components-wrapper">
+            <SpeechGenerator token={adminToken} apiUrl={API_BASE_URL} />
+            <TokenTable adminToken={adminToken} apiUrl={API_BASE_URL} />
+          </div>
+        )}
+        </header>
     </div>
   );
 }
