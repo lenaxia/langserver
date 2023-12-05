@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "web",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
@@ -24,7 +24,10 @@
   "eslintConfig": {
     "extends": [
       "react-app",
-      "react-app/jest"
+      "plugin:jest/recommended"
+    ],
+    "plugins": [
+      "jest"
     ]
   },
   "browserslist": {
@@ -38,5 +41,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "eslint-plugin-jest": "^27.6.0"
   }
 }
