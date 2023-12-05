@@ -227,6 +227,9 @@ def regenerate_token():
             app.logger.info(f'Token ID not found for regeneration: {token_id}')
             return jsonify({'error': 'Token ID not found'}), 404
 
+        # Preserve the rate limit of the existing token
+        current_rate_limit = token.rate_limit
+
         # Generate the new token as a separate string
         random_bytes = os.urandom(24)
         new_token_str = base64.b64encode(random_bytes).decode('utf-8')
@@ -239,7 +242,7 @@ def regenerate_token():
         db.session.delete(token)
         db.session.commit()
 
-        new_token = APIToken(id=token_id, token=salted_hashed_token)
+        new_token = APIToken(id=token_id, token=salted_hashed_token, rate_limit=current_rate_limit)
         db.session.add(new_token)
         db.session.commit()
 
