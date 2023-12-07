@@ -11,7 +11,11 @@ package-lock.json
 /coverage
 
 # production
+<<<<<<< HEAD
 /build
+=======
+build
+>>>>>>> f6068a592982785df68fc774ebecedfac85403d7
 
 # misc
 .DS_Store

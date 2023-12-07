@@ -12,14 +12,30 @@ import logging
 app = Flask(__name__)
 CORS(app)
 
+
 # Configure app
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+config_dir = "/config"
 app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1 MB limit
 
-# Set database URI
-config_dir = "/config"
-db_path = os.environ.get('DATABASE_URI', f'sqlite:///{config_dir}/tokens.db')
-app.config['SQLALCHEMY_DATABASE_URI'] = db_path
+# Database configuration
+db_engine = os.environ.get('DB_ENGINE', 'sqlite').lower()
+
+if db_engine == 'postgres':
+    # PostgreSQL configuration
+    postgres_user = os.environ.get('POSTGRES_USER', 'user')
+    postgres_password = os.environ.get('POSTGRES_PASSWORD', 'password')
+    postgres_db = os.environ.get('POSTGRES_DB', 'mydatabase')
+    postgres_host = os.environ.get('POSTGRES_HOST', 'localhost')
+    postgres_port = os.environ.get('POSTGRES_PORT', '5432')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}'
+elif db_engine == 'sqlite':
+    # SQLite configuration
+    db_path = os.environ.get('DATABASE_URI', f'sqlite:///{config_dir}/tokens.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_path
+else:
+    logging.critical(f"Unsupported DB_ENGINE: {db_engine}. Terminating.")
+    sys.exit("Fatal Error: Unsupported DB_ENGINE.")
+
 
 # Check for ADMIN_TOKEN environment variable
 admin_token = os.environ.get('ADMIN_TOKEN')
