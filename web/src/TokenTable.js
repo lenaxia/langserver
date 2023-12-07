@@ -23,6 +23,7 @@ function TokenTable({ adminToken }) {
         headers: { Authorization: adminToken }
       });
       setTokens(response.data);
+      setError('');
     } catch (error) {
       console.error('Error fetching tokens:', error);
       setError('Failed to fetch tokens');
