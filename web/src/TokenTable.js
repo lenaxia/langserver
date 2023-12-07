@@ -5,6 +5,7 @@ import { faEdit, faTrashAlt, faSave, faTimes, faRedo } from '@fortawesome/free-s
 import './App.css';
 
 function TokenTable({ adminToken }) {
+  const [id, setId] = useState('');
   const [tokens, setTokens] = useState([]);
   const [error, setError] = useState('');
   const [editTokenId, setEditTokenId] = useState(null);
@@ -15,9 +16,33 @@ function TokenTable({ adminToken }) {
     fetchTokens();
   }, [adminToken]);
 
+
+  const addToken = async () => {
+    if (!id) {
+      setError('Please enter an ID');
+      return;
+    }
+    setError('');
+    try {
+      const requestData = {
+        id: id
+      };
+      const response = await axios.post('/add-token', requestData);
+      const newToken = response.data.token;
+      setNewToken(newToken); // Update the state with the new token
+      setId('');
+      fetchTokens(); // Optionally, refresh the token list
+    } catch (error) {
+      console.error('Error adding token:', error);
+      setError('Failed to add token');
+    }
+  };
+
+
+
   const fetchTokens = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/list-tokens', {
+      const response = await axios.get('/list-tokens', {
         headers: { Authorization: adminToken }
       });
       setTokens(response.data);
@@ -33,7 +58,7 @@ function TokenTable({ adminToken }) {
     if (confirmRegenerate) {
       // If the user confirms, proceed with the regeneration
       try {
-        const response = await axios.post('http://localhost:5000/regenerate-token', { id: tokenId }, {
+        const response = await axios.post('/regenerate-token', { id: tokenId }, {
           headers: { Authorization: adminToken }
         });
         setNewToken(response.data.new_token); // Update the state with the new token
@@ -53,7 +78,7 @@ function TokenTable({ adminToken }) {
     if (confirmDelete) {
       // If the user confirms, proceed with the deletion
       try {
-        await axios.post('http://localhost:5000/revoke-token', { token: tokenId }, {
+        await axios.post('/revoke-token', { token: tokenId }, {
           headers: { Authorization: adminToken }
         });
         fetchTokens(); // Refresh the token list
@@ -78,7 +103,7 @@ function TokenTable({ adminToken }) {
   const handleSaveEdit = async (tokenId) => {
     try {
       const newRateLimit = editedRateLimit[tokenId];
-      await axios.post('http://localhost:5000/edit-token', 
+      await axios.post('/edit-token', 
         { id: tokenId, rate_limit: parseInt(newRateLimit, 10) },
         { headers: { Authorization: adminToken }}
       );
@@ -93,10 +118,20 @@ function TokenTable({ adminToken }) {
   return (
     <div className="container">
       {newToken && (
-        <div style={{ fontSize: '0.8rem' }} className="new-token-alert">
+        <div style={{ margin: '10px 0', padding: '10px' }} className="new-token-alert">
           <strong>New Token:</strong> {newToken}
         </div>
       )}
+      <div style={{ textAlign: 'right' }}>
+        <input
+          className="input"
+          type="text"
+          placeholder="Enter ID"
+          value={id}
+          onChange={e => setId(e.target.value)}
+        />
+        <button className="button" onClick={addToken}>Add Token</button>
+      </div>
       <table style={{ fontSize: '0.8rem' }} className="table table-sm table-bordered table-striped">
         <thead>
           <tr>

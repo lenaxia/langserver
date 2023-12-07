@@ -8,7 +8,7 @@ import base64
 import datetime
 import string
 import secrets
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -58,6 +58,26 @@ def require_token(f):
         limiter.limit(f"{token_record.rate_limit} per minute")(f)
         return f(*args, **kwargs)
     return decorated_function
+
+
+react_build_directory = os.path.abspath("/app/web")
+
+@app.route('/admin/static/<path:path>')
+def serve_admin_static(path):
+    return send_from_directory(os.path.join(react_build_directory, 'static'), path)
+
+@app.route('/admin/<filename>')
+def serve_admin_root_files(filename):
+    if filename in ['manifest.json', 'favicon.ico', 'logo192.png', 'logo512.png']:
+        return send_from_directory(react_build_directory, filename)
+    # Forward to the catch-all route for other paths
+    return serve_admin(filename)
+
+@app.route('/admin', defaults={'path': ''})
+@app.route('/admin/<path:path>')
+def serve_admin(path):
+    return send_from_directory(react_build_directory, 'index.html')
+
 
 """
 Adds a new token to the API.

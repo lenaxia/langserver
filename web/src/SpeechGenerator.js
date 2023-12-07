@@ -28,7 +28,7 @@ function SpeechGenerator({ token }) {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/generate-speech', requestData, {
+      const response = await axios.post('/generate-speech', requestData, {
         headers: {
           'Authorization': token,
           'Content-Type': 'application/json'

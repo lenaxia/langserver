@@ -48,19 +48,21 @@
 
 .input {
   margin: 10px 0;
-  padding: 10px;
+  padding: 8px;
   border-radius: 5px;
   border: 1px solid #ddd;
-  width: calc(100% - 22px);
+  font-size: 0.8rem;
 }
 
 .button {
-  padding: 10px 20px;
+  padding: 8px 15px;
   border-radius: 5px;
   border: none;
   background-color: #007bff;
   color: white;
   cursor: pointer;
+  margin: 5px 0;
+  text-align: 0.8rem;
 }
 
 .response {
@@ -157,6 +159,8 @@
   border-collapse: collapse
 }
 
+svg.svg-inline--fa.fa-floppy-disk,
+svg.svg-inline--fa.fa-xmark,
 svg.svg-inline--fa.fa-pen-to-square,
 svg.svg-inline--fa.fa-arrow-rotate-right,
 svg.svg-inline--fa.fa-trash-can {
@@ -164,4 +168,6 @@ svg.svg-inline--fa.fa-trash-can {
   cursor: pointer;
 }
 
-
+.new-token-alert {
+  font-size: 0.8rem;
+}
