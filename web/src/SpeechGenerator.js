@@ -6,7 +6,7 @@ function SpeechGenerator({ token, apiUrl }) {
   const [requestData, setRequestData] = useState(
     JSON.stringify({
       localization: {
-        "zh-tw": "馬",
+        "zh-TW": "馬",
         en: "horse"
       }
     }) +
@@ -52,10 +52,10 @@ function SpeechGenerator({ token, apiUrl }) {
   return (
     <div className="container">
       <textarea
-        className="input"
+        className="input" 
         value={requestData}
         onChange={e => setRequestData(e.target.value)}
-        style={{ height: '100px' }} // Additional inline style for textarea height
+        style={{ height: '100px', width: '80%' }} // Additional inline style for textarea height
       /><br></br>
       <button className="button" onClick={generateSpeech}>Generate Speech</button>
       {loading ? (
