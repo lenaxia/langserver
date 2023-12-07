@@ -17,6 +17,17 @@ function TokenTable({ adminToken }) {
     fetchTokens();
   }, [adminToken]);
 
+  const fetchTokens = async () => {
+    try {
+      const response = await axios.get('/list-tokens', {
+        headers: { Authorization: adminToken }
+      });
+      setTokens(response.data);
+    } catch (error) {
+      console.error('Error fetching tokens:', error);
+      setError('Failed to fetch tokens');
+    }
+  };
 
   const addToken = async () => {
     if (!id) {
@@ -40,53 +51,27 @@ function TokenTable({ adminToken }) {
   };
 
 
-
-  const fetchTokens = async () => {
-    try {
-      const response = await axios.get('/list-tokens', {
-        headers: { Authorization: adminToken }
-      });
-      setTokens(response.data);
-    } catch (error) {
-      console.error('Error fetching tokens:', error);
-      setError('Failed to fetch tokens');
-    }
-  }, [adminToken, apiUrl]); // adminToken is a dependency of fetchTokens
-
-  const addToken = async () => {
-    if (!newTokenId) {
-      setError('Please enter an ID');
-      return;
-    }
-    setError('');
-    try {
-      const response = await axios.post(`${apiUrl}/add-token`, { id: newTokenId }, {
-        headers: { Authorization: adminToken }
-      });
-  
-      const addedToken = response.data.token;
-      setNewToken(addedToken);
-      fetchTokens(); // Refresh token list
-    } catch (error) {
-      console.error('Error adding token:', error.response?.data?.error || error.message);
-      setError(error.response?.data?.error || 'Failed to add token');
-    }
-  };
-  
-
   const handleRegenerateClick = async (tokenId) => {
     const confirmRegenerate = window.confirm('Are you sure you want to regenerate this token?');
     if (confirmRegenerate) {
       try {
-        const response = await axios.post('/regenerate-token', { id: tokenId }, {
+        const tokenDetails = tokens.find(token => token.id === tokenId);
+        if (!tokenDetails) {
+          console.error('Token details not found');
+          setError('Token details not found');
+          return;
+        }
+
+        // Revoke the existing token
+        await axios.post('/revoke-token', { id: tokenId }, {
           headers: { Authorization: adminToken }
         });
-  
-        // Add a new token with the same ID and the previous rate limit
-        const response = await axios.post(`${apiUrl}/add-token`, { id: tokenId, rate_limit: tokenDetails.rate_limit }, {
+
+        // Regenerate the token with the same ID and the previous rate limit
+        const response = await axios.post(`/add-token`, { id: tokenId, rate_limit: tokenDetails.rate_limit }, {
           headers: { Authorization: adminToken }
-        });
-  
+        }); 
+          
         const newToken = response.data.token;
         setNewToken(newToken); // Update the state with the new token
         fetchTokens(); // Refresh the token list
