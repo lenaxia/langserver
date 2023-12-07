@@ -63,7 +63,7 @@ function TokenTable({ adminToken }) {
         }
 
         // Revoke the existing token
-        await axios.post('/revoke-token', { id: tokenId }, {
+        await axios.post('/revoke-token', { token: tokenId }, {
           headers: { Authorization: adminToken }
         });
 
