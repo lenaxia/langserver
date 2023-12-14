@@ -319,7 +319,7 @@ def read_tag_memory(pn532, start_page=4):
 def check_for_nfc_tag(pn532):
     uid = pn532.read_passive_target(timeout=0.5)
     if uid is not None:
-        logger.info("NFC tag detected")
+        logger.debug("NFC tag detected")
         return uid
     return None
 
