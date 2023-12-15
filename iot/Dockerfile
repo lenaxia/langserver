@@ -34,6 +34,7 @@ COPY backend /app
 
 # create config directory
 RUN mkdir /config
+COPY backend/config.ini /config
 
 # Set environment variables for runtime
 ENV PYTHONDONTWRITEBYTECODE 1

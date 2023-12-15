@@ -125,6 +125,7 @@ def handle_write_endpoint():
 
 @app.route('/get_config', methods=['GET'])
 def get_config():
+    load_configuration()
     current_config = {
         'ServerName': config['DEFAULT'].get('ServerName', ''),
         'ApiToken': config['DEFAULT'].get('ApiToken', '')

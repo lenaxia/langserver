@@ -7,7 +7,7 @@ const languageCodes = [
   { code: 'en', name: 'English' },
   { code: 'zh-TW', name: 'Chinese (Mandarin/Taiwan)' },
   { code: 'zh-CN', name: 'Chinese (Simplified)' },
-  { code: 'zh', name: 'Chinese (Mandarin)' }
+  { code: 'zh', name: 'Chinese (Mandarin)' },
   { code: 'af', name: 'Afrikaans' },
   { code: 'ar', name: 'Arabic' },
   { code: 'bg', name: 'Bulgarian' },
@@ -267,10 +267,10 @@ function App() {
             </select>
             <input type="text" value={text} onChange={(e) => handleInputChange(e, 'text')} placeholder="Primary Phrase" />
             {translations.map((translation, index) => (
-              <select key={index} value={translation} onChange={(e) => handleTranslationChange(index, e.target.value)}>
+              <div><select key={index} value={translation} onChange={(e) => handleTranslationChange(index, e.target.value)}>
                 <option value="">Select Translation</option>
                 {languageCodes.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
-              </select>
+              </select></div>
             ))}
           </div>
         )}
@@ -287,7 +287,7 @@ function App() {
       {jsonDisplay && (
         <div>
           <h3>JSON Output:</h3>
-          <pre>{jsonDisplay}</pre>
+          <p>{jsonDisplay}</p>
         </div>
       )}
 
