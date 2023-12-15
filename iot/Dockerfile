@@ -2,16 +2,16 @@
 FROM node:14 as react-build-stage
 
 # Set working directory for the React app build
-WORKDIR /app/frontend
+WORKDIR /app/web
 
 # Copy package.json and package-lock.json for React app
-COPY frontend/package*.json ./
+COPY web/package*.json ./
 
 # Install dependencies for React app
 RUN npm install
 
 # Copy the React app files into the image
-COPY frontend/ .
+COPY web/ .
 
 # Build the React app
 RUN npm run build
@@ -23,10 +23,10 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Create a directory to hold the React app build
-RUN mkdir -p /app/frontend
+RUN mkdir -p /app/web
 
 # Copy the build output from the React app build stage
-COPY --from=react-build-stage /app/frontend/build /app/frontend
+COPY --from=react-build-stage /app/web/build /app/web
 
 # Copy the Flask app files into the image
 COPY backend /app
