@@ -5,9 +5,67 @@ import './App.css';
 // Language codes for dropdown selections
 const languageCodes = [
   { code: 'en', name: 'English' },
-  { code: 'zh-TW', name: 'Chinese (Traditional)' },
+  { code: 'zh-TW', name: 'Chinese (Mandarin/Taiwan)' },
+  { code: 'zh-CN', name: 'Chinese (Simplified)' },
+  { code: 'zh', name: 'Chinese (Mandarin)' }
+  { code: 'af', name: 'Afrikaans' },
+  { code: 'ar', name: 'Arabic' },
+  { code: 'bg', name: 'Bulgarian' },
+  { code: 'bn', name: 'Bengali' },
+  { code: 'bs', name: 'Bosnian' },
+  { code: 'ca', name: 'Catalan' },
+  { code: 'cs', name: 'Czech' },
+  { code: 'da', name: 'Danish' },
+  { code: 'de', name: 'German' },
+  { code: 'el', name: 'Greek' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'et', name: 'Estonian' },
+  { code: 'fi', name: 'Finnish' },
+  { code: 'fr', name: 'French' },
+  { code: 'gu', name: 'Gujarati' },
+  { code: 'hi', name: 'Hindi' },
+  { code: 'hr', name: 'Croatian' },
+  { code: 'hu', name: 'Hungarian' },
+  { code: 'id', name: 'Indonesian' },
+  { code: 'is', name: 'Icelandic' },
+  { code: 'it', name: 'Italian' },
+  { code: 'iw', name: 'Hebrew' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'jw', name: 'Javanese' },
+  { code: 'km', name: 'Khmer' },
+  { code: 'kn', name: 'Kannada' },
+  { code: 'ko', name: 'Korean' },
+  { code: 'la', name: 'Latin' },
+  { code: 'lv', name: 'Latvian' },
+  { code: 'ml', name: 'Malayalam' },
+  { code: 'mr', name: 'Marathi' },
+  { code: 'ms', name: 'Malay' },
+  { code: 'my', name: 'Myanmar (Burmese)' },
+  { code: 'ne', name: 'Nepali' },
+  { code: 'nl', name: 'Dutch' },
+  { code: 'no', name: 'Norwegian' },
+  { code: 'pl', name: 'Polish' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ro', name: 'Romanian' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'si', name: 'Sinhala' },
+  { code: 'sk', name: 'Slovak' },
+  { code: 'sq', name: 'Albanian' },
+  { code: 'sr', name: 'Serbian' },
+  { code: 'su', name: 'Sundanese' },
+  { code: 'sv', name: 'Swedish' },
+  { code: 'sw', name: 'Swahili' },
+  { code: 'ta', name: 'Tamil' },
+  { code: 'te', name: 'Telugu' },
+  { code: 'th', name: 'Thai' },
+  { code: 'tl', name: 'Filipino' },
+  { code: 'tr', name: 'Turkish' },
+  { code: 'uk', name: 'Ukrainian' },
+  { code: 'ur', name: 'Urdu' },
+  { code: 'vi', name: 'Vietnamese' },
   // ...other languages
 ];
+
 
 function App() {
   const [showConfig, setShowConfig] = useState(false);
@@ -253,7 +311,7 @@ function App() {
                 type="text"
                 value={serverName}
                 onChange={(e) => setServerName(e.target.value)}
-                placeholder="Server Name"
+                placeholder="Server URL"
               />
             </div>
       

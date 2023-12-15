@@ -36,6 +36,7 @@
     transform: rotate(360deg);
   }
 }
+/* Global Styles */
 body {
   font-family: 'Arial', sans-serif;
   background-color: #f4f4f4;
@@ -46,7 +47,7 @@ body {
 }
 
 #root {
-  max-width: 600px;
+  max-width: 100%;
   margin: 20px auto;
   padding: 20px;
   background-color: white;
@@ -83,6 +84,31 @@ input {
 select {
   width: 25%;
 }
+
+/* Media Queries for Mobile Devices */
+@media (max-width: 768px) {
+  input[type="text"], select, textarea {
+    width: 90%; /* Slightly smaller width for mobile */
+  }
+
+  select {
+    width: 90%;
+  }
+
+  .container > select, .container > input {
+    margin-right: 0;
+    margin-bottom: 10px; /* Stack vertically */
+  }
+
+  .addLanguage, .input-group, .config-form {
+    text-align: center;
+  }
+
+  .config-form input[type="text"] {
+    width: 90%;
+  }
+}
+
 
 .container {
   margin-bottom: 20px;
