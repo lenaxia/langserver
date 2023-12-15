@@ -6,36 +6,23 @@ import io
 import os
 import signal
 import sys
-import sys
 import board
 import busio
 import logging
 import configparser
 import threading
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 from digitalio import DigitalInOut
 from adafruit_pn532.i2c import PN532_I2C  # pip install adafruit-blinka adafruit-circuitpython-pn532
 
 # Set SDL to use the dummy audio driver so pygame doesn't require an actual sound device
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
-os.environ['TESTMODE'] = 'TRUE'
-
-# Flask application setup
-app = Flask(__name__)
-CORS(app)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger()
+os.environ['TESTMODE'] = 'True'
 
 # Load configuration and schemas
 config = configparser.ConfigParser()
 config.read('config.ini')
-
-# Initialize audio
-pygame.init()
-pygame.mixer.init()
 
 # Environment and Configuration
 SERVER_NAME = config['DEFAULT'].get('ServerName', "https://lang.thekao.cloud/generate-speech")
@@ -44,6 +31,21 @@ HEADERS = {
     "Content-Type": "application/json",
     "Authorization": API_TOKEN
 }
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger()
+
+# Flask application setup
+app = Flask(__name__)
+CORS(app)
+
+# Initialize audio
+pygame.init()
+pygame.mixer.init()
+
+# Define threading event
+read_pause_event = threading.Event()
 
 class MockPN532:
     def __init__(self):
@@ -69,10 +71,37 @@ def init_nfc_reader():
 
 pn532 = init_nfc_reader()
 
-# Define threading event
-read_pause_event = threading.Event()
-
 # Flask Endpoints
+@app.route('/healthz', methods=['GET'])
+def health_check():
+    try:
+        # Perform a basic health check. For example, you can:
+        # - Make a simple database query
+        # - Check if critical services (like external APIs) are reachable
+        # - Return a simple "OK" if basic app functions are working
+        return jsonify({"status": "healthy"}), 200
+    except Exception as e:
+        current_app.logger.error(f"Health check failed: {e}")
+        return jsonify({"status": "unhealthy", "details": str(e)}), 500
+
+react_build_directory = os.path.abspath("./build")
+
+@app.route('/static/<path:path>')
+def serve_admin_static(path):
+    return send_from_directory(os.path.join(react_build_directory, 'static'), path)
+
+@app.route('/<filename>')
+def serve_admin_root_files(filename):
+    if filename in ['manifest.json', 'favicon.ico', 'logo192.png', 'logo512.png']:
+        return send_from_directory(react_build_directory, filename)
+    # Forward to the catch-all route for other paths
+    return serve_admin(filename)
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_admin(path):
+    return send_from_directory(react_build_directory, 'index.html')
+
 @app.route('/perform_http_request', methods=['POST'])
 def perform_http_request_endpoint():
     data = request.json
@@ -323,13 +352,6 @@ def check_for_nfc_tag(pn532):
         return uid
     return None
 
-def signal_handler(sig, frame):
-    logger.info("Gracefully shutting down")
-    read_pause_event.set()  # Ensure the read thread exits
-    read_thread.join()  # Wait for the read thread to finish
-    pygame.quit()
-    sys.exit(0)
-
 
 # Main function for NFC tag reading loop
 def main():
@@ -372,10 +394,15 @@ def main():
         read_thread.join()
 
 
+def signal_handler(sig, frame):
+    logger.info("Gracefully shutting down")
+    read_pause_event.set()  # Ensure the read thread exits
+    read_thread.join()  # Wait for the read thread to finish
+    pygame.quit()
+    sys.exit(0)
 
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
-
 
 def run_flask_app():
     app.run(host='0.0.0.0', port=5000)
@@ -385,3 +412,5 @@ if __name__ == "__main__":
     flask_thread.start()
 
     main()
+
+
