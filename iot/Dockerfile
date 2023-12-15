@@ -45,7 +45,7 @@ ARG PUID=1000
 ARG PGID=1000
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends gcc
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libglib2.0-0
 
 # Add a non-root user and switch to it
 RUN groupadd -r appuser -g ${PGID} && useradd -r -g appuser -u ${PUID} appuser
