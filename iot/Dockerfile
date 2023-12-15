@@ -37,7 +37,7 @@ RUN mkdir /config
 # Set environment variables for runtime
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV FLASK_APP=backend
+ENV FLASK_APP=app
 ENV FLASK_ENV=production
 
 # Set default values for PUID and PGID
