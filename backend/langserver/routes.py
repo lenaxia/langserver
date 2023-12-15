@@ -61,15 +61,13 @@ def require_token(f):
         if not incoming_token:
             current_app.logger.warning("Missing Authorization header")
             return jsonify({'error': 'Unauthorized access'}), 401
-
-        # Retrieve the admin token from app config
-        admin_token = current_app.config.get('ADMIN_TOKEN')
         
-        # Hash the incoming token using the same method as in add_token
+        # Hash the incoming token
+        admin_token = current_app.config.get('ADMIN_TOKEN')
         hashed_incoming_token = APIToken.hash_token(incoming_token, admin_token)
 
         # Check if the provided token is the admin token
-        if hashed_incoming_token == APIToken.hash_token(admin_token, admin_token):
+        if incoming_token == admin_token:
             return f(*args, **kwargs)
 
         # Retrieve the token record using the hashed token
@@ -136,15 +134,15 @@ def add_token():
         current_app.logger.info(f"Token ID {token_id} already exists.")
         return jsonify({'message': 'Token ID already exists. Please use a different ID.'}), 409
 
-    # Generate the new token as a separate string
-    characters = string.ascii_letters + string.digits  # Combines uppercase, lowercase, and digits
+    # Generate the new token
+    characters = string.ascii_letters + string.digits
     new_token_str = ''.join(secrets.choice(characters) for _ in range(32))
 
-    # Salt and hash the token as a separate action
+    # Salt and hash the token
     admin_token = current_app.config.get('ADMIN_TOKEN', '')
     salted_hashed_token = APIToken.hash_token(new_token_str, admin_token)
 
-    # Create a new APIToken instance with the salted and hashed token
+    # Create a new APIToken instance
     new_token = APIToken(id=token_id, token=salted_hashed_token, rate_limit=rate_limit)
 
     try:

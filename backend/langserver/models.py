@@ -11,9 +11,6 @@ class APIToken(db.Model):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Salt and hash the token
-        admin_token = current_app.config.get('ADMIN_TOKEN', '')
-        self.token = self.hash_token(self.token, admin_token)
 
     @staticmethod
     def hash_token(token, salt):
