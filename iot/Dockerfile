@@ -1,5 +1,5 @@
 # Stage 1: Build the React application
-FROM node:14 as react-build-stage
+FROM node:18 as react-build-stage
 
 # Set working directory for the React app build
 WORKDIR /app/web
@@ -9,6 +9,7 @@ COPY web/package*.json ./
 
 # Install dependencies for React app
 RUN npm install
+
 
 # Copy the React app files into the image
 COPY web/ .
@@ -37,7 +38,7 @@ RUN mkdir /config
 # Set environment variables for runtime
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV FLASK_APP=app
+ENV FLASK_APP=langiot
 ENV FLASK_ENV=production
 
 # Set default values for PUID and PGID

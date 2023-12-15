@@ -20,24 +20,16 @@ from adafruit_pn532.i2c import PN532_I2C  # pip install adafruit-blinka adafruit
 os.environ['SDL_AUDIODRIVER'] = 'dummy'
 os.environ['TESTMODE'] = 'True'
 
-# Load configuration and schemas
+# Declare read_thread as a global variable
+read_thread = None
 config = configparser.ConfigParser()
-config.read('config.ini')
-
-# Environment and Configuration
-SERVER_NAME = config['DEFAULT'].get('ServerName', "https://lang.thekao.cloud/generate-speech")
-API_TOKEN = config['DEFAULT'].get('ApiToken', "test123")
-HEADERS = {
-    "Content-Type": "application/json",
-    "Authorization": API_TOKEN
-}
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
 # Flask application setup
-app = Flask(__name__)
+app = Flask(__name__, static_folder='/app/web/static')
 CORS(app)
 
 # Initialize audio
@@ -71,6 +63,11 @@ def init_nfc_reader():
 
 pn532 = init_nfc_reader()
 
+@app.before_request
+def log_request_info():
+    logger.info(f"Request URL: {request.url}")
+
+
 # Flask Endpoints
 @app.route('/healthz', methods=['GET'])
 def health_check():
@@ -81,14 +78,11 @@ def health_check():
         # - Return a simple "OK" if basic app functions are working
         return jsonify({"status": "healthy"}), 200
     except Exception as e:
-        current_app.logger.error(f"Health check failed: {e}")
+        app.logger.error(f"Health check failed: {e}")
         return jsonify({"status": "unhealthy", "details": str(e)}), 500
 
-react_build_directory = os.path.abspath("./build")
-
-@app.route('/static/<path:path>')
-def serve_admin_static(path):
-    return send_from_directory(os.path.join(react_build_directory, 'static'), path)
+# Route for static files
+react_build_directory = os.path.abspath("/app/web")
 
 @app.route('/<filename>')
 def serve_admin_root_files(filename):
@@ -106,13 +100,22 @@ def serve_admin(path):
 def perform_http_request_endpoint():
     data = request.json
     result = perform_http_request(data)
-    return jsonify({"content": result}), 200
+    return send_file(
+        io.BytesIO(result),
+        mimetype="audio/mpeg",
+        as_attachment=True,
+        attachment_filename="audio.mp3"
+    )
 
 @app.route('/play_audio', methods=['POST'])
 def play_audio_endpoint():
-    audio_data = request.data
-    play_audio(audio_data)
-    return jsonify({"message": "Audio playback initiated"}), 200
+    audio_file = request.files.get('audioData')
+    if audio_file:
+        play_audio(audio_file.read())
+        return jsonify({"message": "Audio playback initiated"}), 200
+    else:
+        return jsonify({"error": "No audio data received"}), 400
+
 
 @app.route('/handle_write', methods=['POST'])
 def handle_write_endpoint():
@@ -134,12 +137,22 @@ def update_config():
     update_result = update_configuration(new_config)
     return jsonify(update_result), 200
 
+def load_configuration():
+    global SERVER_NAME, API_TOKEN, HEADERS
+
+    config_path = '/config/config.ini'
+    config.read(config_path)
+
+    SERVER_NAME = config['DEFAULT'].get('ServerName', "https://lang.thekao.cloud/generate-speech")
+    API_TOKEN = config['DEFAULT'].get('ApiToken', "test123")
+    HEADERS = {
+        "Content-Type": "application/json",
+        "Authorization": API_TOKEN
+    }
+
 def update_configuration(new_config):
     config_path = '/config/config.ini'
     try:
-        # Read the current configuration
-        config.read(config_path)
-
         # Update with new values
         if 'ServerName' in new_config:
             config['DEFAULT']['ServerName'] = new_config['ServerName']
@@ -150,8 +163,8 @@ def update_configuration(new_config):
         with open(config_path, 'w') as configfile:
             config.write(configfile)
 
-        # Optionally, reload configuration in the application if needed
-        # (e.g., update global variables SERVER_NAME and API_TOKEN)
+        # Reload configuration
+        load_configuration()
 
         return {"message": "Configuration updated successfully"}
     except Exception as e:
@@ -182,15 +195,14 @@ def perform_http_request(data):
             logger.info(f"Using provided data as content: {content}")
 
         logger.info(f"Sending data to server: {content}")
-        response = requests.post(SERVER_NAME, headers=HEADERS, json=content, timeout=10)
+        response = requests.post(SERVER_NAME, headers=HEADERS, json=content, timeout=10, stream=True)
         logger.info(f"Response status code: {response.status_code}")
         response.raise_for_status()
         logger.info("Request successful.")
-        return response.content
+        return response.content  # Directly return the binary content of the response
     except requests.RequestException as e:
         logger.error(f"HTTP request error: {e}")
         return None
-
 
 def play_audio(audio_data):
     try:
@@ -269,7 +281,7 @@ def is_valid_json(json_str):
     except json.JSONDecodeError:
         return False
 
-def write_nfc_combined(pn532, json_str, start_page=4):
+def write_nfc(pn532, json_str, start_page=4):
     # Check if the string is valid JSON
     try:
         json.loads(json_str)
@@ -404,10 +416,13 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
+load_configuration()
+
 def run_flask_app():
     app.run(host='0.0.0.0', port=5000)
 
 if __name__ == "__main__":
+
     flask_thread = threading.Thread(target=run_flask_app)
     flask_thread.start()
 

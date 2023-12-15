@@ -98,31 +98,52 @@ function App() {
   };
 
   const performHttpRequest = async () => {
+    setAudio(null)
     if (!isValidJson()) {
       alert('Please ensure all fields have text and languages selected');
       return;
     }
-
+  
     try {
       const jsonStr = generateJson();
       console.log('Sending JSON:', jsonStr);
       setJsonDisplay(jsonStr);
-      const response = await axios.post('/perform_http_request', { json_str: jsonStr });
-      playAudio(response.data.content);
+      
+      // Parse the JSON string into an object
+      const jsonData = JSON.parse(jsonStr);
+  
+      // Send the JSON object directly
+      const response = await axios.post('/perform_http_request', jsonData, { responseType: 'blob' });
+      console.log('Received response:', response);
+  
+      if (response.data) {
+        const url = URL.createObjectURL(response.data);
+        console.log('Generated URL:', url);
+        playAudio(url);
+        setAudio(url);
+      } else {
+        console.error('No data in response');
+      }
     } catch (error) {
       console.error('Error performing HTTP request:', error);
       setError(`Error: ${error.response ? error.response.status : ''} ${error.message}`);
     }
   };
-
+  
+  
   const playAudio = async (audioData) => {
     try {
-      await axios.post('/play_audio', audioData, { responseType: 'blob' });
-      setAudio(URL.createObjectURL(new Blob([audioData])));
+      const formData = new FormData();
+      formData.append('audioData', new Blob([audioData], { type: 'audio/mpeg' }));
+  
+      await axios.post('/play_audio', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
     } catch (error) {
       console.error('Error playing audio:', error);
     }
   };
+  
 
   const handleWriteNFC = async () => {
     if (!isValidJson()) {
@@ -200,10 +221,10 @@ function App() {
         <button onClick={addLocalizationOrTranslation}>Add {formType === 'localization' ? 'Localization' : 'Translation'}</button>
       </div>
       <div>
-        <button onClick={performHttpRequest}>Test Speech Generation</button>
+        <button onClick={performHttpRequest}>Test Audio</button>
         <button onClick={handleWriteNFC}>Write to NFC Tag</button>
         {error && <div className="error-message">{error}</div>}
-        {audio && <button onClick={() => new Audio(audio).play()}>Play Audio</button>}
+        {audio && <div><audio className="audioPlayer" controls src={audio} /></div>}
       </div>
       {jsonDisplay && (
         <div>

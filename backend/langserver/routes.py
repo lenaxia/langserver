@@ -61,16 +61,19 @@ def require_token(f):
         if not incoming_token:
             current_app.logger.warning("Missing Authorization header")
             return jsonify({'error': 'Unauthorized access'}), 401
-        
+
         # Retrieve the admin token from app config
         admin_token = current_app.config.get('ADMIN_TOKEN')
         
+        # Hash the incoming token using the same method as in add_token
+        hashed_incoming_token = APIToken.hash_token(incoming_token, admin_token)
+
         # Check if the provided token is the admin token
-        if incoming_token == admin_token:
+        if hashed_incoming_token == APIToken.hash_token(admin_token, admin_token):
             return f(*args, **kwargs)
 
-        hashed_token = APIToken.hash_token(incoming_token, current_app.config.get('ADMIN_TOKEN', ''))
-        token_record = APIToken.query.filter_by(token=hashed_token).first()
+        # Retrieve the token record using the hashed token
+        token_record = APIToken.query.filter_by(token=hashed_incoming_token).first()
         if not token_record:
             current_app.logger.warning(f"Invalid token attempted: {incoming_token}")
             return jsonify({'error': 'Unauthorized access'}), 401
@@ -79,6 +82,7 @@ def require_token(f):
         limiter.limit(f"{token_record.rate_limit} per minute")(f)
         return f(*args, **kwargs)
     return decorated_function
+
 
 
 react_build_directory = os.path.abspath("/app/web")
@@ -134,7 +138,7 @@ def add_token():
 
     # Generate the new token as a separate string
     characters = string.ascii_letters + string.digits  # Combines uppercase, lowercase, and digits
-    new_token_str = ''.join(secrets.choice(characters) for _ in range(64))
+    new_token_str = ''.join(secrets.choice(characters) for _ in range(32))
 
     # Salt and hash the token as a separate action
     admin_token = current_app.config.get('ADMIN_TOKEN', '')
