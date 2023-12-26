@@ -303,8 +303,8 @@ def generate_speech():
             # Process completed tasks
             for future in as_completed(tasks):
                 try:
-                    tts_audio = future.result()
-                    tts_audio.write_to_fp(combined_mp3)
+                    tts_audio_bytes = future.result()
+                    combined_mp3.write(tts_audio_bytes)
                 except Exception as e:
                     app.logger.error(f"Error in task: {traceback.format_exc()}")
 
@@ -320,8 +320,7 @@ def generate_tts(language, text):
         tts = gTTS(text=text, lang=language)
         audio_fp = io.BytesIO()
         tts.write_to_fp(audio_fp)
-        audio_fp.seek(0)
-        return audio_fp
+        return audio_fp.getvalue()
     except Exception as e:
         raise Exception(f"Failed to generate speech for {language}: {e}")
 
@@ -333,6 +332,7 @@ def translate_and_tts(original_text, original_lang, target_lang):
         return generate_tts(target_lang, translation)
     except Exception as e:
         raise Exception(f"Failed in translation or TTS for {target_lang}: {e}")
+
 
 
 
