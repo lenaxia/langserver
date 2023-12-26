@@ -20,6 +20,8 @@ from . import app, limiter, db
 from .models import APIToken
 import hashlib
 from flask import current_app
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import traceback
 
 
 """
@@ -271,56 +273,40 @@ Example Curl:
 @limiter.limit("10 per minute")
 def generate_speech():
     data = request.json
-    valid_languages_found = False
 
     try:
         combined_mp3 = io.BytesIO()
+        tasks = []
 
-        if 'localization' in data:
-            for lang_code, text in data['localization'].items():
-                if lang_code in lang.tts_langs():
-                    valid_languages_found = True
-                    try:
-                        tts = gTTS(text=text, lang=lang_code)
-                        tts.write_to_fp(combined_mp3)
-                    except Exception as e:
-                        app.logger.error(f"Failed to generate speech for {lang_code}: {e}")
+        with ThreadPoolExecutor() as executor:
+            if 'localization' in data:
+                for lang_code, text in data['localization'].items():
+                    if lang_code in lang.tts_langs():
+                        tasks.append(executor.submit(generate_tts, lang_code, text))
 
-        elif 'text' in data and 'language' in data and 'translations' in data:
-            original_text = data['text']
-            original_lang = data['language']
+            elif 'text' in data and 'language' in data and 'translations' in data:
+                original_text = data['text']
+                original_lang = data['language']
 
-            if original_lang not in lang.tts_langs():
-                app.logger.info(f"Invalid primary language: {original_lang}")
-                return jsonify({"error": "Primary language is invalid"}), 400
+                if original_lang not in lang.tts_langs():
+                    app.logger.info(f"Invalid primary language: {original_lang}")
+                    return jsonify({"error": "Primary language is invalid"}), 400
 
-            valid_languages_found = True
-            try:
-                tts = gTTS(text=original_text, lang=original_lang)
-                tts.write_to_fp(combined_mp3)
-            except Exception as e:
-                app.logger.error(f"Failed to generate speech for primary language {original_lang}: {e}")
+                # Queue TTS task for original language
+                tasks.append(executor.submit(generate_tts, original_lang, original_text))
 
-            translator = Translator()
-            for lang_code in data['translations']:
-                if lang_code in lang.tts_langs():
-                    try:
-                        translation = translator.translate(original_text, src=original_lang, dest=lang_code)
-                        translated_text = translation.text
-                        app.logger.info(f"Translation to {lang_code}: {translated_text}")
-                        tts = gTTS(text=translated_text, lang=lang_code)
-                        tts.write_to_fp(combined_mp3)
-                    except Exception as e:
-                        app.logger.error(f"Failed to generate speech for {lang_code}: {e}")
+                # Queue translation and subsequent TTS tasks
+                for lang_code in data['translations']:
+                    if lang_code in lang.tts_langs():
+                        tasks.append(executor.submit(translate_and_tts, original_text, original_lang, lang_code))
 
-        else:
-            app.logger.error("Invalid JSON format received in generate-speech")
-            return jsonify({"error": "Invalid JSON format"}), 400
-
-        if not valid_languages_found:
-            app.logger.info("No valid languages found in generate-speech request")
-            tts = gTTS(text="No valid languages found", lang='en')
-            tts.write_to_fp(combined_mp3)
+            # Process completed tasks
+            for future in as_completed(tasks):
+                try:
+                    tts_audio = future.result()
+                    tts_audio.write_to_fp(combined_mp3)
+                except Exception as e:
+                    app.logger.error(f"Error in task: {traceback.format_exc()}")
 
         combined_mp3.seek(0)
         return send_file(combined_mp3, mimetype='audio/mpeg')
@@ -328,6 +314,27 @@ def generate_speech():
     except Exception as e:
         app.logger.error(f"Error in generate-speech: {e}")
         return jsonify({"error": "Text-to-Speech conversion failed", "details": str(e)}), 500
+
+def generate_tts(language, text):
+    try:
+        tts = gTTS(text=text, lang=language)
+        audio_fp = io.BytesIO()
+        tts.write_to_fp(audio_fp)
+        audio_fp.seek(0)
+        return audio_fp
+    except Exception as e:
+        raise Exception(f"Failed to generate speech for {language}: {e}")
+
+def translate_and_tts(original_text, original_lang, target_lang):
+    try:
+        translator = Translator()
+        translation = translator.translate(original_text, src=original_lang, dest=target_lang).text
+        app.logger.info(f"Translation to {target_lang}: {translation}")
+        return generate_tts(target_lang, translation)
+    except Exception as e:
+        raise Exception(f"Failed in translation or TTS for {target_lang}: {e}")
+
+
 
 """
 Retrieves a list of all tokens.
